@@ -1,11 +1,19 @@
+import {Sandbox} from "@e2b/code-interpreter"
+
 import { gemini, createAgent } from "@inngest/agent-kit";
 
 import { inngest } from "./client";
+import { getSandbox } from "./utils";
 
 export const helloWorld = inngest.createFunction(
   { id: "hello-world" },
   { event: "test/hello.world" },
-  async ({ event }) => {
+  async ({ event,step }) => {
+    const sandboxId = await step.run("get-sandbox-id", async ()=> {
+      const sandbox = await Sandbox.create("genii-nextjs-test-2")
+      return sandbox.sandboxId;
+    });
+
     const summarizer = createAgent({
       name: "summarizer",
       system: "You are an expert summarizer.  You summarize in 2 words",
@@ -16,6 +24,12 @@ export const helloWorld = inngest.createFunction(
       `Summarize the following text: ${event.data.value}`
     );
 
-    return { output };
+    const sandboxUrl = await step.run("get-sandbox-url", async () => {
+      const sandbox = await getSandbox(sandboxId);
+      const host = sandbox.getHost(3000);
+      return `https://${host}`;
+    })
+
+    return { output, sandboxUrl };
   }
 );
