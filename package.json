@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@e2b/code-interpreter": "^1.5.1",
-    "@inngest/agent-kit": "^0.9.0",
     "@prisma/client": "^6.13.0",
     "@radix-ui/react-slot": "^1.2.3",
     "@tanstack/react-query": "^5.84.1",
@@ -20,18 +19,18 @@
     "class-variance-authority": "^0.7.1",
     "client-only": "^0.0.1",
     "clsx": "^2.1.1",
-    "inngest": "^3.40.1",
+    "inngest": "^3.46.0",
     "lucide-react": "^0.536.0",
-    "next": "15.3.4",
+    "next": "^15.5.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "server-only": "^0.0.1",
     "superjson": "^2.2.2",
-    "tailwind-merge": "^3.3.1",
-    "zod": "^4.0.14"
+    "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@inngest/agent-kit": "^0.13.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -42,6 +41,7 @@
     "tailwindcss": "^4",
     "tsx": "^4.20.3",
     "tw-animate-css": "^1.3.6",
-    "typescript": "^5"
+    "typescript": "^5",
+    "zod": "^4.0.17"
   }
 }
