@@ -4,12 +4,13 @@ import { gemini, createAgent, createTool, Network, createNetwork } from "@innges
 
 import { inngest } from "./client";
 import { getSandbox, lastAssistantTextMessageContent } from "./utils";
-import { z } from "zod";
+import { object, z } from "zod";
 import { PROMPT } from "@/prompt";
+import prisma from "@/lib/db";
 
-export const helloWorld = inngest.createFunction(
-  { id: "hello-world" },
-  { event: "test/hello.world" },
+export const codeAgentFunction = inngest.createFunction(
+  { id: "code-agent" },
+  { event: "code-agent/run" },
   async ({ event, step }) => {
     const sandboxId = await step.run("get-sandbox-id", async () => {
       const sandbox = await Sandbox.create("genii-nextjs-test-2");
@@ -135,9 +136,19 @@ export const helloWorld = inngest.createFunction(
         onResponse: async ({ result, network}) => {
           const lastAssistantMessageText = lastAssistantTextMessageContent(result);
 
-          if (lastAssistantMessageText && network) {
-            if (lastAssistantMessageText.includes("<task_summary>")) {
-              network.state.data.summary = lastAssistantMessageText;
+          if (network) {
+            // Initialize network state if not already done
+            if (!network.state.data) {
+              network.state.data = { completed: false, files: {} };
+            }
+
+            if (lastAssistantMessageText) {
+              if (lastAssistantMessageText.includes("<task_summary>") || 
+                  lastAssistantMessageText.includes("Task completed") ||
+                  lastAssistantMessageText.includes("Done with the task")) {
+                network.state.data.summary = lastAssistantMessageText;
+                network.state.data.completed = true;
+              }
             }
           }
 
@@ -151,16 +162,33 @@ export const helloWorld = inngest.createFunction(
       agents: [codeAgent],
       maxIter: 15,
       router: async ({network}) => {
-        const summary = network.state.data.summary;
-
-        if (summary) {
-          return;
+        // Initialize state if needed
+        if (!network.state.data) {
+          network.state.data = { completed: false, files: {}, iterations: 0 };
         }
+        
+        network.state.data.iterations = (network.state.data.iterations || 0) + 1;
+        
+        // Stop if task is completed
+        if (network.state.data.completed) {
+          console.log("Task completed, stopping router");
+          return undefined;
+        }
+        
+        // Stop if max iterations reached
+        if (network.state.data.iterations >= 15) {
+          console.log("Max iterations reached, stopping router");
+          return undefined;
+        }
+        
+        // Continue with agent
         return codeAgent;
       }
     })
 
     const result = await network.run(event.data.value)
+
+    // const isError = !result.state.data.summary || Object.keys(result.state.data.files || {}).length === 0;
 
     const sandboxUrl = await step.run("get-sandbox-url", async () => {
       const sandbox = await getSandbox(sandboxId);
@@ -168,11 +196,32 @@ export const helloWorld = inngest.createFunction(
       return `https://${host}`;
     });
 
+    await step.run("save-result", async () => {
+      // Ensure files is a valid object, not null/undefined
+      const files = result.state.data?.files || {};
+      const summary = result.state.data?.summary || "Task completed";
+
+      return await prisma.message.create({
+        data: {
+          content: summary,
+          role: "ASSISTANT",
+          type: "RESULT",
+          fragment: {
+            create: {
+              sandboxUrl: sandboxUrl,
+              title: "Fragment",
+              files: files,
+            }
+          }
+        }
+      })
+    })
+
     return { 
       url: sandboxUrl,
       title: "Fragment",
-      files: result.state.data.files,
-      summary: result.state.data.summary
+      files: result.state.data?.files || {},
+      summary: result.state.data?.summary || "Task completed"
     };
   }
 );
